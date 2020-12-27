@@ -4,9 +4,7 @@
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
-from subprocess import Popen, PIPE, call
-import os
-
+from subprocess import Popen, PIPE
 
 class StatusUtility(object):
     status_data = {
@@ -35,41 +33,12 @@ class StatusUtility(object):
         entry = self.status_data[metric]
         name = entry['name']
         cmd = entry['cmd']
-        icon = entry['icon']
+        glyph = entry['icon']
         value = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
-        return (name, value, icon)
+        return name, value, glyph
 
     def get_keys(self):
         return self.status_data.keys()
-
-    def get_hostname(self):
-        hostname = Popen(['uname', '-n'], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
-        (key, value) = ('🖥', hostname)
-        # (key, value) = self.get_data('hostname')
-        return f'{key} {value}'
-
-    def get_user(self):
-        user = os.getenv('USER')
-        (key, value) = ('👨🏻', user)
-        return f'{key} {value}'
-
-    def get_uptime(self):
-        cmd = r"uptime | sed 's/.*up \([^,]*\), .*/\1/'"
-        uptime=Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
-        (key, value) = ('⬆️', uptime)
-        return f'{key} {value}'
-
-    def get_ip(self):
-        cmd = r"ifconfig | grep inet | grep -v inet6 | cut -d' ' -f2 | tail -n1"
-        ip = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
-        (key, value) = ('🌐', ip)
-        return f'{key} {value}'
-
-    def get_os(self):
-        cmd = r"echo `sw_vers -productName` `sw_vers -productVersion`"
-        os = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
-        (key, value) = ('💿', os)
-        return f'{key} {value}'
 
 
 class SystemInfoWindow(QWidget):

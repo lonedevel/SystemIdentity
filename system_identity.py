@@ -9,9 +9,43 @@ import os
 
 
 class StatusUtility(object):
+    status_data = {
+        'hostname': {'name': "Host Name",
+                     'cmd': r"uname -n", 'icon': '🖥'},
+        'username': {'name': "User Name",
+                     'cmd': r"whoami", 'icon': '👨🏻'},
+        'uptime': {'name': "Uptime",
+                   'cmd': r"uptime | sed 's/.*up \([^,]*\), .*/\1/'", 'icon': '⬆'},
+        'ipaddr': {'name': "IPv4 Address",
+                   'cmd': r"ifconfig | grep inet | grep -v inet6 | cut -d' ' -f2 | tail -n1", 'icon': '🌐'},
+        'os': {'name': "Operating System",
+               'cmd': r"echo `sw_vers -productName` `sw_vers -productVersion`", 'icon': '💿'},
+        'cpu_name': {'name': "CPU Name",
+                     'cmd': r"sysctl -n machdep.cpu.brand_string |awk '$1=$1' | sed 's/([A-Z]\{1,2\})//g'",
+                     'icon': '⚙️'},
+        'cpu_core': {'name': "CPU Cores",
+                    'cmd': "sysctl -n hw.physicalcpu",
+                     'icon': "🛠"},
+        'cpu_thread': {'name': "CPU Threads",
+                       'cmd': "sysctl -n hw.logicalcpu",
+                       'icon': "🔩"}
+    }
+
+    def get_data(self, metric):
+        entry = self.status_data[metric]
+        name = entry['name']
+        cmd = entry['cmd']
+        icon = entry['icon']
+        value = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
+        return (name, value, icon)
+
+    def get_keys(self):
+        return self.status_data.keys()
+
     def get_hostname(self):
         hostname = Popen(['uname', '-n'], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
         (key, value) = ('🖥', hostname)
+        # (key, value) = self.get_data('hostname')
         return f'{key} {value}'
 
     def get_user(self):
@@ -26,9 +60,15 @@ class StatusUtility(object):
         return f'{key} {value}'
 
     def get_ip(self):
-        cmd = "ifconfig | grep inet | grep -v inet6 | cut -d\" \" -f2 | tail -n1"
+        cmd = r"ifconfig | grep inet | grep -v inet6 | cut -d' ' -f2 | tail -n1"
         ip = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
         (key, value) = ('🌐', ip)
+        return f'{key} {value}'
+
+    def get_os(self):
+        cmd = r"echo `sw_vers -productName` `sw_vers -productVersion`"
+        os = Popen(['/bin/bash', '-c', cmd], stdout=PIPE).communicate()[0].decode('Utf-8').rstrip('\n')
+        (key, value) = ('💿', os)
         return f'{key} {value}'
 
 
@@ -38,37 +78,31 @@ class SystemInfoWindow(QWidget):
         self.setWindowFlags(Qt.WindowStaysOnTopHint)
         #windowRectangle = self.frameGeometry()
         self.move(0, 0)
-
-        su = StatusUtility()
+        status_utility = StatusUtility()
 
         self.setWindowTitle("System Info")
         layout = QGridLayout()
 
-        (hostname_label, hostname_value) = (QLabel("Hostname:"), QLabel(su.get_hostname()))
-        (username_label, username_value) = (QLabel("Username:"), QLabel(su.get_user()))
-        (uptime_label, uptime_value) = (QLabel("Uptime:"), QLabel(su.get_uptime()))
-        (ip_label, ip_value) = (QLabel("IP Address:"), QLabel(su.get_ip()))
-
-        hostname_label.setFont(QFont('Arial', 14, QFont.Bold))
-        username_label.setFont(QFont('Arial', 14, QFont.Bold))
-        uptime_label.setFont(QFont('Arial', 14, QFont.Bold))
-        ip_label.setFont(QFont('Arial', 14, QFont.Bold))
-
-        hostname_value.setFont(QFont('Menlo', 14, QFont.Bold))
-        username_value.setFont(QFont('Menlo', 14, QFont.Bold))
-        uptime_value.setFont(QFont('Menlo', 14, QFont.Bold))
-        ip_value.setFont(QFont('Menlo', 14, QFont.Bold))
-
-        layout.addWidget(hostname_label, 0, 0)
-        layout.addWidget(hostname_value, 0, 1)
-        layout.addWidget(username_label, 1, 0)
-        layout.addWidget(username_value, 1, 1)
-        layout.addWidget(uptime_label, 2, 0)
-        layout.addWidget(uptime_value, 2, 1)
-        layout.addWidget(ip_label, 3, 0)
-        layout.addWidget(ip_value, 3, 1)
+        grid_row = 0
+        for widget_entry in status_utility.get_keys():
+            name_label = self.create_label(status_utility.get_data(widget_entry)[0] + ": ", 'name', layout, grid_row, 0)
+            value_label = self.create_label(status_utility.get_data(widget_entry)[2] + " " +
+                                            status_utility.get_data(widget_entry)[1], '', layout, grid_row, 1)
+            grid_row += 1
 
         self.setLayout(layout)
+
+    def create_label(self, name, type, layout, row, col):
+        label = QLabel(name)
+
+        if type == 'name':
+            label.setFont(QFont('Arial', 14, QFont.Bold))
+        else:
+            label.setFont(QFont('Menlo', 14))
+
+        layout.addWidget(label, row, col)
+
+        return label
 
 
 def showPanel(state):
@@ -78,7 +112,6 @@ def showPanel(state):
         window.hide()
 
 app = QApplication([])
-#app.setQuitOnLastWindowClosed(False)
 
 # Create the icon
 icon = QIcon("brain.png")
@@ -97,10 +130,11 @@ panel_action.setCheckable(True)
 panel_action.triggered.connect(showPanel)
 menu.addAction(panel_action)
 menu.addSeparator()
-menu.addAction(su.get_hostname())
-menu.addAction(su.get_user())
-menu.addAction(su.get_uptime())
-menu.addAction(su.get_ip())
+
+for widget_entry in su.get_keys():
+    menu_text = su.get_data(widget_entry)[2].ljust(3) + \
+                su.get_data(widget_entry)[1].rjust(25)
+    menu.addAction(menu_text)
 
 # Add a Quit option to the menu.
 quit = QAction("Quit")
@@ -111,6 +145,5 @@ menu.addAction(quit)
 tray.setContextMenu(menu)
 
 window = SystemInfoWindow()
-
 
 app.exec_()
